@@ -14,13 +14,17 @@ import {
   ChevronDown,
   Menu,
   X,
-  Flame
+  Flame,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import { useTour } from '../context/TourContext';
+import { audioAlarm } from '../utils/audioAlarm';
 
 export const Navbar: React.FC = () => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isSoundActive, setIsSoundActive] = useState(audioAlarm.isSoundEnabled);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { startTour } = useTour();
 
@@ -139,8 +143,23 @@ export const Navbar: React.FC = () => {
             </div>
           </nav>
 
-          {/* Right Action: Guided Tour Launcher */}
+          {/* Right Action: Sound Toggle & Guided Tour Launcher */}
           <div className="hidden sm:flex items-center space-x-2">
+            <button
+              onClick={() => {
+                const enabled = audioAlarm.toggleSound();
+                setIsSoundActive(enabled);
+              }}
+              className={`p-1.5 rounded-lg border text-xs transition-colors flex items-center space-x-1 ${
+                isSoundActive
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                  : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'
+              }`}
+              title={isSoundActive ? 'Threat Alarm Sound: ON (Click to mute)' : 'Threat Alarm Sound: MUTED (Click to activate)'}
+            >
+              {isSoundActive ? <Volume2 className="w-3.5 h-3.5 text-emerald-600" /> : <VolumeX className="w-3.5 h-3.5 text-slate-400" />}
+            </button>
+
             <button
               onClick={startTour}
               className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white shadow-sm transition-colors flex items-center space-x-1.5"

@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../services/api';
 import { wsStream } from '../services/websocket';
 import { PcapFileItem, ReplayStatus } from '../types';
+import { audioAlarm } from '../utils/audioAlarm';
 import { 
   PlayCircle, 
   Pause, 
@@ -13,7 +14,10 @@ import {
   Gauge,
   ChevronDown,
   Layers,
-  Sparkles
+  Sparkles,
+  Volume2,
+  VolumeX,
+  BellRing
 } from 'lucide-react';
 
 const FALLBACK_PCAPS: PcapFileItem[] = [
@@ -30,6 +34,10 @@ export const PCAPReplay: React.FC = () => {
   const [pcaps, setPcaps] = useState<PcapFileItem[]>(FALLBACK_PCAPS);
   const [selectedPcap, setSelectedPcap] = useState<string>('syn_flood_ddos.pcap');
   const [speed, setSpeed] = useState<number>(2.0);
+  const [isAudioMuted, setIsAudioMuted] = useState<boolean>(!audioAlarm.isSoundEnabled);
+  const [lastAlarmTime, setLastAlarmTime] = useState<number>(0);
+  const prevAlertCount = useRef<number>(0);
+
   const [replayStatus, setReplayStatus] = useState<ReplayStatus>({
     status: 'IDLE',
     total_packets: 0,
@@ -40,6 +48,15 @@ export const PCAPReplay: React.FC = () => {
     progress_percentage: 0.0,
     elapsed_seconds: 0.0
   });
+
+  const updateReplayAndCheckAudio = (st: ReplayStatus) => {
+    setReplayStatus(st);
+    if (st.alerts_triggered > prevAlertCount.current) {
+      audioAlarm.playThreatAlarm('CRITICAL');
+      prevAlertCount.current = st.alerts_triggered;
+      setLastAlarmTime(Date.now());
+    }
+  };
 
   const loadPcaps = async () => {
     try {
@@ -57,6 +74,7 @@ export const PCAPReplay: React.FC = () => {
     try {
       const st = await api.getReplayStatus();
       setReplayStatus(st);
+      prevAlertCount.current = st.alerts_triggered;
     } catch (e) {
       console.error(e);
     }
@@ -69,7 +87,7 @@ export const PCAPReplay: React.FC = () => {
     // Listen to real-time progress via WebSocket
     const unsubscribe = wsStream.subscribe((msg) => {
       if (msg.type === 'REPLAY_PROGRESS' || msg.type === 'REPLAY_COMPLETED') {
-        setReplayStatus(msg.data);
+        updateReplayAndCheckAudio(msg.data);
       }
     });
 
@@ -78,7 +96,7 @@ export const PCAPReplay: React.FC = () => {
       try {
         const st = await api.getReplayStatus();
         if (st.status === 'RUNNING' || st.status === 'PAUSED') {
-          setReplayStatus(st);
+          updateReplayAndCheckAudio(st);
         }
       } catch {}
     }, 400);
@@ -91,11 +109,24 @@ export const PCAPReplay: React.FC = () => {
 
   const handleStart = async () => {
     try {
+      // Unlock audio context explicitly on user click
+      audioAlarm.unlock();
+      prevAlertCount.current = 0;
       const res = await api.startReplay(selectedPcap, speed);
-      setReplayStatus(res);
+      updateReplayAndCheckAudio(res);
     } catch (e) {
       console.error(e);
     }
+  };
+
+  const handleToggleSound = () => {
+    const enabled = audioAlarm.toggleSound();
+    setIsAudioMuted(!enabled);
+  };
+
+  const handleTestAlarm = () => {
+    audioAlarm.testAlarm();
+    setLastAlarmTime(Date.now());
   };
 
   const handlePause = async () => {
@@ -142,14 +173,41 @@ export const PCAPReplay: React.FC = () => {
   return (
     <div id="tour-replay-tab" className="space-y-4 animate-fadeIn pb-8 font-sans">
       {/* Header */}
-      <div className="border-b border-slate-200 pb-3">
-        <h1 className="text-base sm:text-lg font-bold text-slate-900 flex items-center space-x-2">
-          <PlayCircle className="w-5 h-5 text-red-600" />
-          <span>Passive PCAP Replay & Attack Simulator</span>
-        </h1>
-        <p className="text-xs text-slate-500 font-normal mt-0.5">
-          Stream synthetic and genuine attack datasets through the real-time detection pipeline to observe live threat alarms.
-        </p>
+      <div className="border-b border-slate-200 pb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div>
+          <h1 className="text-base sm:text-lg font-bold text-slate-900 flex items-center space-x-2">
+            <PlayCircle className="w-5 h-5 text-red-600" />
+            <span>Passive PCAP Replay & Attack Simulator</span>
+          </h1>
+          <p className="text-xs text-slate-500 font-normal mt-0.5">
+            Stream synthetic and genuine attack datasets through the real-time detection pipeline to observe live threat alarms.
+          </p>
+        </div>
+
+        {/* Audio Alarm Quick Controls */}
+        <div className="flex items-center space-x-2 self-start sm:self-auto">
+          <button
+            onClick={handleToggleSound}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-all border ${
+              !isAudioMuted
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
+            }`}
+            title="Toggle Threat Alarm Audio"
+          >
+            {!isAudioMuted ? <Volume2 className="w-3.5 h-3.5 text-emerald-600" /> : <VolumeX className="w-3.5 h-3.5 text-slate-500" />}
+            <span>Alarm Audio: {!isAudioMuted ? 'ON' : 'MUTED'}</span>
+          </button>
+
+          <button
+            onClick={handleTestAlarm}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 flex items-center space-x-1.5 shadow-2xs transition-all active:scale-95"
+            title="Test SOC Threat Alarm Siren"
+          >
+            <BellRing className={`w-3.5 h-3.5 text-red-600 ${Date.now() - lastAlarmTime < 1500 ? 'animate-bounce' : ''}`} />
+            <span>Test Sound 🔔</span>
+          </button>
+        </div>
       </div>
 
       {/* Main Replay Console */}

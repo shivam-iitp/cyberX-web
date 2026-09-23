@@ -5,6 +5,7 @@ import { AlertDetailModal } from '../components/AlertDetailModal';
 import { api } from '../services/api';
 import { wsStream } from '../services/websocket';
 import { Alert, ThreatAnalytics } from '../types';
+import { audioAlarm } from '../utils/audioAlarm';
 import { 
   ShieldAlert, 
   Play, 
@@ -66,6 +67,7 @@ export const Dashboard: React.FC = () => {
     // Subscribe to real-time WebSocket events
     const unsubscribe = wsStream.subscribe((message) => {
       if (message.type === 'NEW_ALERT' && message.data) {
+        audioAlarm.playThreatAlarm(message.data.severity);
         setAlerts((prev) => [message.data, ...prev.slice(0, 99)]);
         setStats((prev) => ({
           ...prev,
