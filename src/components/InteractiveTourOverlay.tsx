@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTour, TOUR_STEPS } from '../context/TourContext';
 import { 
   ArrowRight, 
@@ -47,12 +48,12 @@ export const InteractiveTourOverlay: React.FC = () => {
   const totalSteps = TOUR_STEPS.length;
   const isLastStep = currentStepIndex === totalSteps - 1;
 
-  return (
-    <div className="fixed inset-0 z-50 pointer-events-none transition-all duration-300">
+  const overlayContent = (
+    <div className="fixed inset-0 z-[99999] pointer-events-none transition-all duration-300">
       
       {/* SVG Mask Spotlight: Darkens everything while leaving the focused container crystal-clear */}
       {targetRect ? (
-        <svg className="fixed inset-0 w-full h-full pointer-events-auto" onClick={endTour}>
+        <svg className="fixed inset-0 w-screen h-screen pointer-events-auto" onClick={endTour}>
           <defs>
             <mask id="tour-spotlight-mask">
               <rect x="0" y="0" width="100%" height="100%" fill="white" />
@@ -76,7 +77,7 @@ export const InteractiveTourOverlay: React.FC = () => {
           />
         </svg>
       ) : (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-[2px] pointer-events-auto" onClick={endTour} />
+        <div className="fixed inset-0 w-screen h-screen bg-slate-900/60 backdrop-blur-[2px] pointer-events-auto" onClick={endTour} />
       )}
 
       {/* Target Focus Border Ring & Animated Pointing Hand */}
@@ -206,4 +207,6 @@ export const InteractiveTourOverlay: React.FC = () => {
       </div>
     </div>
   );
+
+  return createPortal(overlayContent, document.body);
 };

@@ -85,6 +85,7 @@ export const Dashboard: React.FC = () => {
     try {
       await api.resolveAlert(id);
       setAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, status: 'RESOLVED' } : a)));
+      setSelectedAlert((prev) => (prev && prev.id === id ? { ...prev, status: 'RESOLVED' } : prev));
     } catch (e) {
       console.error(e);
     }
