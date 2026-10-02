@@ -11,9 +11,8 @@ class WebSocketStreamService {
       return;
     }
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
-    const wsUrl = `${protocol}//${host}/ws/live-stream`;
+    const defaultWsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/live-stream`;
+    const wsUrl = import.meta.env.VITE_WS_URL || defaultWsUrl;
 
     try {
       this.ws = new WebSocket(wsUrl);
